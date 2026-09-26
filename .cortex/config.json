@@ -1,0 +1,12 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "sql_execute|snowflake_sql_execute|bash|write|edit",
+        "hooks": [
+          { "type": "command", "command": ".cortex/hooks/pretooluse_guard.sh", "timeout": 10 }
+        ]
+      }
+    ]
+  }
+}

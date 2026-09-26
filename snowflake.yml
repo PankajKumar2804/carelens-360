@@ -1,0 +1,13 @@
+definition_version: 2
+entities:
+  carelens_app:
+    type: streamlit
+    identifier:
+      name: CARELENS_360_COPILOT
+      database: CARELENS
+      schema: AI
+    stage: CARELENS.AI.STREAMLIT_STAGE
+    query_warehouse: CARELENS_WH
+    main_file: app/carelens_app.py
+    title: "CareLens 360 Copilot"
+    comment: "Patient/member 360 and clinical-regulatory document copilot. Synthetic data."

@@ -1,0 +1,4 @@
+band,patients,avg_lace,observed_readmit_rate
+LOW,110,2.545,0.256
+INTERMEDIATE,84,6.607,0.333
+HIGH,26,11.308,0.462
