@@ -34,9 +34,9 @@ def ask_agent(question: str) -> dict:
         "stream": False,
     }
     t0 = time.time()
+    body_str = json.dumps(body)
     raw = session.sql(
-        "SELECT SNOWFLAKE.CORTEX.DATA_AGENT_RUN(?, ?) AS r",
-        params=[AGENT, json.dumps(body)],
+        f"SELECT SNOWFLAKE.CORTEX.DATA_AGENT_RUN('{AGENT}', $${body_str}$$) AS r"
     ).collect()[0]["R"]
     return {"raw": json.loads(raw) if isinstance(raw, str) else raw,
             "latency_ms": int((time.time() - t0) * 1000)}
@@ -89,7 +89,7 @@ st.warning(
 st.title("CareLens 360")
 st.caption("Patient & member 360 with a clinical and regulatory document copilot")
 
-tab_copilot, tab_patient, tab_trust = st.tabs(["Copilot", "Patient 360", "Trust & Evidence"])
+tab_copilot, tab_patient, tab_clinic, tab_trust = st.tabs(["Copilot", "Patient 360", "Clinic Analytics", "Trust & Evidence"])
 
 # ---------------------------------------------------------------- Copilot
 with tab_copilot:
@@ -191,10 +191,16 @@ with tab_patient:
 
             g1, g2 = st.columns(2)
             with g1:
-                st.markdown("**Open care gaps**")
-                st.dataframe(q(f"""SELECT gap_type, gap_detail, governing_document_id
-                                   FROM CARELENS.GOLD.CARE_GAP WHERE patient_id='{pid}'"""),
-                             use_container_width=True, hide_index=True)
+                st.markdown("**Open care gaps (Actionable)**")
+                gaps = q(f"SELECT gap_type, gap_detail, governing_document_id FROM CARELENS.GOLD.CARE_GAP WHERE patient_id='{pid}'")
+                if gaps.empty:
+                    st.success("No open care gaps for this patient.")
+                else:
+                    for _, gap in gaps.iterrows():
+                        with st.container(border=True):
+                            st.error(f"**{gap['GAP_TYPE']}**: {gap['GAP_DETAIL']}")
+                            st.caption(f"Source: {gap['GOVERNING_DOCUMENT_ID']}")
+                            st.button(f"Resolve: {gap['GAP_TYPE']}", key=f"resolve_{gap['GAP_TYPE']}_{pid}", use_container_width=True)
             with g2:
                 st.markdown("**Active medications**")
                 st.dataframe(q(f"""SELECT medication_name, drug_class, adherence_pdc, days_supply
@@ -202,12 +208,20 @@ with tab_patient:
                                    WHERE patient_id='{pid}' AND active_flag=1"""),
                              use_container_width=True, hide_index=True)
 
-            st.markdown("**Recent labs**")
-            st.dataframe(q(f"""SELECT collected_date, test_name, result_value, unit,
+            st.markdown("**Recent labs (Trend)**")
+            labs = q(f"""SELECT collected_date, test_name, result_value, unit,
                                       ref_low, ref_high, abnormal_flag
                                FROM CARELENS.CURATED.FACT_LAB WHERE patient_id='{pid}'
-                               ORDER BY collected_date DESC LIMIT 12"""),
-                         use_container_width=True, hide_index=True)
+                               ORDER BY collected_date DESC LIMIT 12""")
+            if not labs.empty:
+                # Pivot labs to show a line chart of results over time
+                labs['COLLECTED_DATE'] = pd.to_datetime(labs['COLLECTED_DATE'])
+                pivot_labs = labs.pivot_table(index='COLLECTED_DATE', columns='TEST_NAME', values='RESULT_VALUE')
+                st.line_chart(pivot_labs)
+                with st.expander("View Raw Lab Data"):
+                    st.dataframe(labs, use_container_width=True, hide_index=True)
+            else:
+                st.caption("No recent labs found.")
 
             st.markdown("**Linked documents**")
             st.dataframe(q(f"""SELECT DISTINCT doc_id, doc_title, doc_type, effective_date
@@ -215,6 +229,33 @@ with tab_patient:
                          use_container_width=True, hide_index=True)
     except Exception as exc:
         st.error(f"Could not load the patient view: {exc}")
+
+# ---------------------------------------------------------------- Clinic Analytics
+with tab_clinic:
+    st.subheader("Clinic Population Health & Analytics")
+    try:
+        st.markdown("### Risk Overview by Clinic")
+        clinic_risk = q("""SELECT p.attributed_clinic, 
+                                  COUNT(r.patient_id) as total_patients,
+                                  ROUND(AVG(r.carelens_adjusted_score), 2) as avg_risk_score
+                           FROM CARELENS.GOLD.RISK_READMISSION r
+                           JOIN CARELENS.GOLD.PATIENT_360 p USING (patient_id)
+                           GROUP BY 1 ORDER BY avg_risk_score DESC""")
+        
+        c1, c2 = st.columns([2, 1])
+        with c1:
+            st.bar_chart(clinic_risk.set_index('ATTRIBUTED_CLINIC')['AVG_RISK_SCORE'])
+        with c2:
+            st.dataframe(clinic_risk, use_container_width=True, hide_index=True)
+
+        st.markdown("### Top Clinics by Open Care Gaps")
+        clinic_gaps = q("""SELECT p.attributed_clinic, COUNT(g.gap_type) as total_open_gaps
+                           FROM CARELENS.GOLD.CARE_GAP g
+                           JOIN CARELENS.GOLD.PATIENT_360 p USING (patient_id)
+                           GROUP BY 1 ORDER BY total_open_gaps DESC""")
+        st.bar_chart(clinic_gaps.set_index('ATTRIBUTED_CLINIC'))
+    except Exception as exc:
+        st.error(f"Could not load clinic analytics: {exc}")
 
 # ---------------------------------------------------------------- Trust
 with tab_trust:
@@ -238,12 +279,17 @@ with tab_trust:
             st.error("One or more gates failed. Fix before demoing.")
 
         st.markdown("**Risk band distribution**")
-        st.dataframe(q("""SELECT risk_band, COUNT(*) AS patients,
+        risk_dist = q("""SELECT risk_band, COUNT(*) AS patients,
                                  ROUND(AVG(lace_index),2) AS avg_lace,
                                  ROUND(AVG(carelens_adjusted_score),2) AS avg_adjusted
                           FROM CARELENS.GOLD.RISK_READMISSION GROUP BY 1
-                          ORDER BY avg_lace DESC"""),
-                     use_container_width=True, hide_index=True)
+                          ORDER BY avg_lace DESC""")
+        
+        rc1, rc2 = st.columns([2, 1])
+        with rc1:
+            st.bar_chart(risk_dist.set_index('RISK_BAND')['PATIENTS'])
+        with rc2:
+            st.dataframe(risk_dist, use_container_width=True, hide_index=True)
 
         st.markdown("**Care gaps by governing document**")
         st.dataframe(q("""SELECT governing_document_id, gap_type, COUNT(*) AS open_gaps
