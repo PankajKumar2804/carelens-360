@@ -148,7 +148,7 @@ with tab_copilot:
 # ---------------------------------------------------------------- Patient 360
 with tab_patient:
     st.subheader("One patient, end to end")
-    st.info("💡 **Clinical View:** Select a patient below to view their comprehensive medical profile. CareLens computes readmission risk and highlights actionable care gaps by cross-referencing patient history with clinical guidelines.")
+    st.caption("Comprehensive medical profile including LACE-derived readmission risk and guideline-driven care gaps.")
     try:
         roster = q(session, """SELECT r.patient_id, p.full_name, r.risk_band, r.lace_index,
                              r.carelens_adjusted_score, r.attributed_clinic
@@ -165,10 +165,10 @@ with tab_patient:
         if not prof.empty:
             r0, k0 = prof.iloc[0], risk.iloc[0]
             a, b, c, d = st.columns(4)
-            a.metric("Risk band", k0["RISK_BAND"], help="Categorical risk of hospital readmission.")
-            b.metric("LACE index", int(k0["LACE_INDEX"]), help="Standard clinical score based on Length of stay, Acuity, Comorbidities, and ED visits.")
-            c.metric("Adjusted score", int(k0["CARELENS_ADJUSTED_SCORE"]), help="CareLens proprietary score adding social determinants (adherence, financial barriers) to the baseline LACE index.")
-            d.metric("Open gaps", int(q(session, f"SELECT COUNT(*) n FROM CARELENS.GOLD.CARE_GAP WHERE patient_id='{pid}'").iloc[0]["N"]), help="Unresolved care gaps requiring clinical attention.")
+            a.metric("Risk band", k0["RISK_BAND"], help="Categorical risk stratification for 30-day hospital readmission.")
+            b.metric("LACE index", int(k0["LACE_INDEX"]), help="Standardized LACE index scoring: Length of stay, Acuity of admission, Comorbidities, and Emergency department visits.")
+            c.metric("Adjusted score", int(k0["CARELENS_ADJUSTED_SCORE"]), help="Composite risk score incorporating baseline LACE index with Social Determinants of Health (SDoH) modifiers.")
+            d.metric("Open gaps", int(q(session, f"SELECT COUNT(*) n FROM CARELENS.GOLD.CARE_GAP WHERE patient_id='{pid}'").iloc[0]["N"]), help="Count of active, unresolved clinical care gaps flagged by regulatory guidelines.")
 
             st.info(f"**Why this score:** {k0['SCORE_EXPLANATION']}")
             st.caption(f"Methodology: {k0['METHODOLOGY_CITATION']}")
@@ -234,7 +234,7 @@ with tab_patient:
 # ---------------------------------------------------------------- Clinic Analytics
 with tab_clinic:
     st.subheader("Clinic Population Health & Analytics")
-    st.info("💡 **Executive Summary:** This dashboard aggregates patient data across all clinics to highlight which facilities manage the highest risk populations and have the most open care gaps. Use this to guide resource allocation.")
+    st.caption("Aggregated population health metrics for resource allocation and risk monitoring across facilities.")
     try:
         st.markdown("### Risk Overview by Clinic")
         clinic_risk = q(session, """SELECT p.attributed_clinic, 
@@ -262,7 +262,7 @@ with tab_clinic:
 # ---------------------------------------------------------------- Trust
 with tab_trust:
     st.subheader("Trust & Evidence")
-    st.info("💡 **Governance Transparency:** Healthcare AI requires absolute transparency. This panel audits our synthetic data pipelines, tracks how often the Copilot cites real evidence (Grounding), and proves that Snowflake's row-level security is actively enforcing data masking.")
+    st.caption("System observability: Pipeline data quality, AI grounding metrics, and active Role-Based Access Control (RBAC) postures.")
     try:
         counts = q(session, """SELECT 'Patients' AS object, COUNT(*) AS n FROM CARELENS.GOLD.PATIENT_360
                       UNION ALL SELECT 'Encounters', COUNT(*) FROM CARELENS.CURATED.FACT_ENCOUNTER
