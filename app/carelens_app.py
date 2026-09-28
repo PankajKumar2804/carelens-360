@@ -22,8 +22,8 @@ AGENT = "CARELENS.AI.CARELENS_COPILOT"
 
 
 @st.cache_data(ttl=300)
-def q(sql: str) -> pd.DataFrame:
-    return session.sql(sql).to_pandas()
+def q(_session, sql: str) -> pd.DataFrame:
+    return _session.sql(sql).to_pandas()
 
 
 def ask_agent(question: str) -> dict:
@@ -149,25 +149,25 @@ with tab_copilot:
 with tab_patient:
     st.subheader("One patient, end to end")
     try:
-        roster = q("""SELECT r.patient_id, p.full_name, r.risk_band, r.lace_index,
+        roster = q(session, """SELECT r.patient_id, p.full_name, r.risk_band, r.lace_index,
                              r.carelens_adjusted_score, r.attributed_clinic
                       FROM CARELENS.GOLD.RISK_READMISSION r
                       JOIN CARELENS.GOLD.PATIENT_360 p USING (patient_id)
                       ORDER BY r.carelens_adjusted_score DESC, r.lace_index DESC LIMIT 60""")
-        labels = [f"{r.patient_id} · {r.full_name} · {r.risk_band} (LACE {r.lace_index})"
+        labels = [f"{r.PATIENT_ID} · {r.FULL_NAME} · {r.RISK_BAND} (LACE {r.LACE_INDEX})"
                   for r in roster.itertuples()]
         pick = st.selectbox("Patient (highest adjusted risk first)", labels)
         pid = pick.split(" · ")[0]
 
-        prof = q(f"SELECT * FROM CARELENS.GOLD.PATIENT_360 WHERE patient_id = '{pid}'")
-        risk = q(f"SELECT * FROM CARELENS.GOLD.RISK_READMISSION WHERE patient_id = '{pid}'")
+        prof = q(session, f"SELECT * FROM CARELENS.GOLD.PATIENT_360 WHERE patient_id = '{pid}'")
+        risk = q(session, f"SELECT * FROM CARELENS.GOLD.RISK_READMISSION WHERE patient_id = '{pid}'")
         if not prof.empty:
             r0, k0 = prof.iloc[0], risk.iloc[0]
             a, b, c, d = st.columns(4)
             a.metric("Risk band", k0["RISK_BAND"])
             b.metric("LACE index", int(k0["LACE_INDEX"]))
             c.metric("Adjusted score", int(k0["CARELENS_ADJUSTED_SCORE"]))
-            d.metric("Open gaps", int(q(f"SELECT COUNT(*) n FROM CARELENS.GOLD.CARE_GAP WHERE patient_id='{pid}'").iloc[0]["N"]))
+            d.metric("Open gaps", int(q(session, f"SELECT COUNT(*) n FROM CARELENS.GOLD.CARE_GAP WHERE patient_id='{pid}'").iloc[0]["N"]))
 
             st.info(f"**Why this score:** {k0['SCORE_EXPLANATION']}")
             st.caption(f"Methodology: {k0['METHODOLOGY_CITATION']}")
@@ -192,7 +192,7 @@ with tab_patient:
             g1, g2 = st.columns(2)
             with g1:
                 st.markdown("**Open care gaps (Actionable)**")
-                gaps = q(f"SELECT gap_type, gap_detail, governing_document_id FROM CARELENS.GOLD.CARE_GAP WHERE patient_id='{pid}'")
+                gaps = q(session, f"SELECT gap_type, gap_detail, governing_document_id FROM CARELENS.GOLD.CARE_GAP WHERE patient_id='{pid}'")
                 if gaps.empty:
                     st.success("No open care gaps for this patient.")
                 else:
@@ -203,13 +203,13 @@ with tab_patient:
                             st.button(f"Resolve: {gap['GAP_TYPE']}", key=f"resolve_{gap['GAP_TYPE']}_{pid}", use_container_width=True)
             with g2:
                 st.markdown("**Active medications**")
-                st.dataframe(q(f"""SELECT medication_name, drug_class, adherence_pdc, days_supply
+                st.dataframe(q(session, f"""SELECT medication_name, drug_class, adherence_pdc, days_supply
                                    FROM CARELENS.CURATED.FACT_MEDICATION
                                    WHERE patient_id='{pid}' AND active_flag=1"""),
                              use_container_width=True, hide_index=True)
 
             st.markdown("**Recent labs (Trend)**")
-            labs = q(f"""SELECT collected_date, test_name, result_value, unit,
+            labs = q(session, f"""SELECT collected_date, test_name, result_value, unit,
                                       ref_low, ref_high, abnormal_flag
                                FROM CARELENS.CURATED.FACT_LAB WHERE patient_id='{pid}'
                                ORDER BY collected_date DESC LIMIT 12""")
@@ -224,7 +224,7 @@ with tab_patient:
                 st.caption("No recent labs found.")
 
             st.markdown("**Linked documents**")
-            st.dataframe(q(f"""SELECT DISTINCT doc_id, doc_title, doc_type, effective_date
+            st.dataframe(q(session, f"""SELECT DISTINCT doc_id, doc_title, doc_type, effective_date
                                FROM CARELENS.CURATED.DOC_CHUNK WHERE patient_id='{pid}'"""),
                          use_container_width=True, hide_index=True)
     except Exception as exc:
@@ -235,7 +235,7 @@ with tab_clinic:
     st.subheader("Clinic Population Health & Analytics")
     try:
         st.markdown("### Risk Overview by Clinic")
-        clinic_risk = q("""SELECT p.attributed_clinic, 
+        clinic_risk = q(session, """SELECT p.attributed_clinic, 
                                   COUNT(r.patient_id) as total_patients,
                                   ROUND(AVG(r.carelens_adjusted_score), 2) as avg_risk_score
                            FROM CARELENS.GOLD.RISK_READMISSION r
@@ -249,7 +249,7 @@ with tab_clinic:
             st.dataframe(clinic_risk, use_container_width=True, hide_index=True)
 
         st.markdown("### Top Clinics by Open Care Gaps")
-        clinic_gaps = q("""SELECT p.attributed_clinic, COUNT(g.gap_type) as total_open_gaps
+        clinic_gaps = q(session, """SELECT p.attributed_clinic, COUNT(g.gap_type) as total_open_gaps
                            FROM CARELENS.GOLD.CARE_GAP g
                            JOIN CARELENS.GOLD.PATIENT_360 p USING (patient_id)
                            GROUP BY 1 ORDER BY total_open_gaps DESC""")
@@ -261,7 +261,7 @@ with tab_clinic:
 with tab_trust:
     st.subheader("Trust & Evidence")
     try:
-        counts = q("""SELECT 'Patients' AS object, COUNT(*) AS n FROM CARELENS.GOLD.PATIENT_360
+        counts = q(session, """SELECT 'Patients' AS object, COUNT(*) AS n FROM CARELENS.GOLD.PATIENT_360
                       UNION ALL SELECT 'Encounters', COUNT(*) FROM CARELENS.CURATED.FACT_ENCOUNTER
                       UNION ALL SELECT 'Claims', COUNT(*) FROM CARELENS.CURATED.FACT_CLAIM
                       UNION ALL SELECT 'Documents', COUNT(DISTINCT doc_id) FROM CARELENS.CURATED.DOC_METADATA
@@ -271,7 +271,7 @@ with tab_trust:
             col.metric(row.OBJECT, f"{row.N:,}")
 
         st.markdown("**Data quality gates** — zero failing rows is the release condition")
-        dq = q("SELECT * FROM CARELENS.CURATED.DQ_CHECKS ORDER BY failing_rows DESC")
+        dq = q(session, "SELECT * FROM CARELENS.CURATED.DQ_CHECKS ORDER BY failing_rows DESC")
         st.dataframe(dq, use_container_width=True, hide_index=True)
         if dq["FAILING_ROWS"].sum() == 0:
             st.success("All quality gates pass.")
@@ -279,7 +279,7 @@ with tab_trust:
             st.error("One or more gates failed. Fix before demoing.")
 
         st.markdown("**Risk band distribution**")
-        risk_dist = q("""SELECT risk_band, COUNT(*) AS patients,
+        risk_dist = q(session, """SELECT risk_band, COUNT(*) AS patients,
                                  ROUND(AVG(lace_index),2) AS avg_lace,
                                  ROUND(AVG(carelens_adjusted_score),2) AS avg_adjusted
                           FROM CARELENS.GOLD.RISK_READMISSION GROUP BY 1
@@ -292,13 +292,13 @@ with tab_trust:
             st.dataframe(risk_dist, use_container_width=True, hide_index=True)
 
         st.markdown("**Care gaps by governing document**")
-        st.dataframe(q("""SELECT governing_document_id, gap_type, COUNT(*) AS open_gaps
+        st.dataframe(q(session, """SELECT governing_document_id, gap_type, COUNT(*) AS open_gaps
                           FROM CARELENS.GOLD.CARE_GAP GROUP BY 1,2 ORDER BY 3 DESC"""),
                      use_container_width=True, hide_index=True)
 
         st.markdown("**Grounding scorecard**")
         try:
-            sc = q("SELECT * FROM CARELENS.GOVERNANCE.V_GROUNDING_SCORECARD LIMIT 14")
+            sc = q(session, "SELECT * FROM CARELENS.GOVERNANCE.V_GROUNDING_SCORECARD LIMIT 14")
             st.dataframe(sc, use_container_width=True, hide_index=True) if not sc.empty else st.caption(
                 "No answers logged yet. Ask something on the Copilot tab.")
         except Exception:
