@@ -118,7 +118,7 @@ CREATE OR REPLACE SEMANTIC VIEW PATIENT_360_SV
     clm.denial_reason AS denial_reason WITH SYNONYMS ('why denied','denial','rejection reason'),
     clm.claim_type AS claim_type WITH SYNONYMS ('facility or professional'),
     dx.icd10_code AS icd10_code WITH SYNONYMS ('diagnosis code','ICD','ICD-10'),
-    dx.description AS dx_description WITH SYNONYMS ('condition name','diagnosis'),
+    dx.diagnosis_description AS diagnosis_description WITH SYNONYMS ('condition name','diagnosis'),
     rx.drug_class AS drug_class WITH SYNONYMS ('medication class','therapeutic class'),
     rx.medication_name AS medication_name WITH SYNONYMS ('drug','medication')
   )
@@ -153,51 +153,35 @@ CREATE OR REPLACE SEMANTIC VIEW PATIENT_360_SV
     clm.denial_rate AS DIV0(COUNT(CASE WHEN clm.claim_status = 'DENIED' THEN 1 END), COUNT(*))
       WITH SYNONYMS ('denial rate','percent denied','rejection rate')
   )
-  COMMENT = 'CareLens 360 governed semantic layer. FULLY SYNTHETIC DATA.';
+  COMMENT = 'CareLens 360 governed semantic layer. FULLY SYNTHETIC DATA.'
 
-/* ---- guidance the generator reads --------------------------------------- */
-ALTER SEMANTIC VIEW PATIENT_360_SV SET AI_SQL_GENERATION = $$
-Rules for generating SQL against this view:
-1. Whenever a risk score or risk band is returned, also return risk.score_explanation so the
-   arithmetic travels with the number.
+  /* ---- guidance the generator reads (inline on CREATE, not ALTER) -------- */
+  AI_SQL_GENERATION 'Rules for generating SQL against this view:
+1. Whenever a risk score or risk band is returned, also return risk.score_explanation so the arithmetic travels with the number.
 2. Whenever a care gap is returned, also return gaps.governing_document_id.
-3. Prefer risk.lace_index over risk.carelens_adjusted_score unless the user asks for the adjusted
-   score; the adjusted score includes local modifiers that are not part of the published index.
+3. Prefer risk.lace_index over risk.carelens_adjusted_score unless the user asks for the adjusted score.
 4. Use patient.age_band for age cohort questions rather than deriving new buckets.
 5. Filters on boolean condition and medication dimensions are TRUE/FALSE, not 1/0.
-6. All data is synthetic. Never caveat that a specific real person may be affected.
-$$;
+6. All data is synthetic. Never caveat that a specific real person may be affected.'
 
-ALTER SEMANTIC VIEW PATIENT_360_SV SET AI_VERIFIED_QUERIES = $$
-- name: high_risk_panel_with_reasons
-  question: Which patients are high risk for readmission and why?
-  sql: |
-    SELECT * FROM SEMANTIC_VIEW(CARELENS.AI.PATIENT_360_SV
-      DIMENSIONS risk.patient_id, risk.risk_band, risk.score_explanation, patient.attributed_clinic
-      METRICS risk.avg_lace_index)
-    WHERE risk_band = 'HIGH' ORDER BY avg_lace_index DESC
-- name: readmission_rate_by_clinic
-  question: What is the 30-day readmission rate by clinic?
-  sql: |
-    SELECT * FROM SEMANTIC_VIEW(CARELENS.AI.PATIENT_360_SV
-      DIMENSIONS patient.attributed_clinic
-      METRICS patient.patient_count, patient.readmission_rate)
-    ORDER BY readmission_rate DESC
-- name: care_gaps_by_lob
-  question: How many open care gaps are there by line of business and gap type?
-  sql: |
-    SELECT * FROM SEMANTIC_VIEW(CARELENS.AI.PATIENT_360_SV
-      DIMENSIONS patient.line_of_business, gaps.gap_type, gaps.governing_document_id
-      METRICS gaps.open_gap_count)
-    ORDER BY open_gap_count DESC
-- name: denial_reasons_ranked
-  question: What are the most common claim denial reasons?
-  sql: |
-    SELECT * FROM SEMANTIC_VIEW(CARELENS.AI.PATIENT_360_SV
-      DIMENSIONS clm.denial_reason
-      METRICS clm.denial_rate, clm.total_allowed)
-    ORDER BY denial_rate DESC
-$$;
+  AI_VERIFIED_QUERIES (
+    high_risk_panel_with_reasons AS (
+      QUESTION 'Which patients are high risk for readmission and why?'
+      SQL 'SELECT * FROM SEMANTIC_VIEW(CARELENS.AI.PATIENT_360_SV DIMENSIONS risk.patient_id, risk.risk_band, risk.score_explanation, patient.attributed_clinic METRICS risk.avg_lace_index) WHERE risk_band = ''HIGH'' ORDER BY avg_lace_index DESC'
+    ),
+    readmission_rate_by_clinic AS (
+      QUESTION 'What is the 30-day readmission rate by clinic?'
+      SQL 'SELECT * FROM SEMANTIC_VIEW(CARELENS.AI.PATIENT_360_SV DIMENSIONS patient.attributed_clinic METRICS patient.patient_count, patient.readmission_rate) ORDER BY readmission_rate DESC'
+    ),
+    care_gaps_by_lob AS (
+      QUESTION 'How many open care gaps are there by line of business and gap type?'
+      SQL 'SELECT * FROM SEMANTIC_VIEW(CARELENS.AI.PATIENT_360_SV DIMENSIONS patient.line_of_business, gaps.gap_type, gaps.governing_document_id METRICS gaps.open_gap_count) ORDER BY open_gap_count DESC'
+    ),
+    denial_reasons_ranked AS (
+      QUESTION 'What are the most common claim denial reasons?'
+      SQL 'SELECT * FROM SEMANTIC_VIEW(CARELENS.AI.PATIENT_360_SV DIMENSIONS clm.denial_reason METRICS clm.denial_rate, clm.total_allowed) ORDER BY denial_rate DESC'
+    )
+  );
 
 SELECT * FROM SEMANTIC_VIEW(PATIENT_360_SV
   DIMENSIONS patient.attributed_clinic, risk.risk_band

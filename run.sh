@@ -35,7 +35,7 @@ case "${1:-all}" in
     run sql/05_search_and_agent.sql
     run sql/06_governance.sql
     run sql/07_eval.sql
-    echo "✅ deployed. next: ./run.sh app"
+    echo "✅ Deployed successfully!"
     ;;
   *) echo "unknown target: $1"; exit 1 ;;
 esac

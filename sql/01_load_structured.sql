@@ -25,7 +25,7 @@ CREATE OR REPLACE TABLE RAW_CLAIMS (
   claim_status STRING, denial_reason STRING, drg_code STRING);
 
 CREATE OR REPLACE TABLE RAW_DIAGNOSES (
-  patient_id STRING, icd10_code STRING, description STRING, onset_date DATE,
+  patient_id STRING, icd10_code STRING, diagnosis_description STRING, onset_date DATE,
   charlson_weight NUMBER, hcc_flag NUMBER, clinical_status STRING);
 
 CREATE OR REPLACE TABLE RAW_MEDICATIONS (
