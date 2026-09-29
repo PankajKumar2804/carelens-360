@@ -14,16 +14,6 @@ SELECT
   $1::STRING                                    AS doc_text
 FROM @RAW.DOC_STAGE (FILE_FORMAT => 'RAW.WHOLE_FILE_TEXT', PATTERN => '.*[.]md');
 
-/* PDF / DOCX path — enable when the corpus includes binary documents.
-   AI_PARSE_DOCUMENT in LAYOUT mode preserves headings and tables, which is
-   what makes section-level citation possible for those formats too.
-
-INSERT INTO DOC_RAW
-SELECT REGEXP_REPLACE(RELATIVE_PATH,'^.*/','') , RELATIVE_PATH,
-       AI_PARSE_DOCUMENT(TO_FILE('@RAW.DOC_STAGE', RELATIVE_PATH),
-                         {'mode':'LAYOUT'}):content::STRING
-FROM DIRECTORY(@RAW.DOC_STAGE) WHERE RELATIVE_PATH ILIKE '%.pdf';
-*/
 
 /* ---- 2. metadata: deterministic regex first ------------------------------
    Most documents here carry a predictable header block, so regex is free and

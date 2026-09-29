@@ -28,8 +28,6 @@ def q(_session, sql: str) -> pd.DataFrame:
 
 def ask_agent(question: str) -> dict:
     body = {
-        "thread_id": 0,
-        "parent_message_id": 0,
         "messages": [{"role": "user", "content": [{"type": "text", "text": question}]}],
         "stream": False,
     }
@@ -63,20 +61,31 @@ def unpack(resp: dict):
             if btype == "text" and b.get("text"):
                 text.append(b["text"])
             elif btype == "tool_use":
-                tools.append(b.get("name") or b.get("tool_name") or "tool")
+                tu = b.get("tool_use") if isinstance(b.get("tool_use"), dict) else {}
+                name = tu.get("name") or b.get("name") or b.get("tool_name") or "tool"
+                tools.append(name)
                 blob = json.dumps(b)
                 if "SELECT" in blob.upper():
-                    for cand in (b.get("input") or {}).values():
+                    inp = tu.get("input") if isinstance(tu.get("input"), dict) else (b.get("input") if isinstance(b.get("input"), dict) else {})
+                    for cand in inp.values():
                         if isinstance(cand, str) and "SELECT" in cand.upper():
                             sqls.append(cand)
-            elif btype == "tool_results":
-                blob = json.dumps(b)
+            elif btype == "tool_result" or btype == "tool_results":
+                tr = b.get("tool_result") if isinstance(b.get("tool_result"), dict) else b
+                blob = json.dumps(tr)
                 for token in ("doc_id", "citation_label", "source_id"):
                     if token in blob:
-                        cites.append(b)
+                        cites.append(tr)
                         break
-            if isinstance(b.get("content"), list):
-                walk(b["content"])
+                tr_content = tr.get("content")
+                if isinstance(tr_content, list):
+                    walk(tr_content)
+            b_content = b.get("content")
+            if isinstance(b_content, list):
+                cv = b.get("content_values")
+                if isinstance(cv, list):
+                    walk(cv)
+                walk(b_content)
 
     walk(blocks)
     return "\n\n".join(text) or "_No text returned. Check the raw response below._", tools, sqls, cites
