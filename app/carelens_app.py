@@ -117,6 +117,12 @@ def q(_session, sql: str) -> pd.DataFrame:
     return _session.sql(sql).to_pandas()
 
 
+def safe_int(v, default=0):
+    try:
+        return int(float(str(v))) if v is not None else default
+    except (ValueError, TypeError):
+        return default
+
 def ask_agent(question: str) -> dict:
     body = {
         "messages": [{"role": "user", "content": [{"type": "text", "text": question}]}],
@@ -267,7 +273,7 @@ if page == "Home":
 
         dq_fails = 0
         try:
-            dq_fails = int(q(session, "SELECT SUM(failing_rows) n FROM CARELENS.CURATED.DQ_CHECKS").iloc[0]["N"] or 0)
+            dq_fails = safe_int(q(session, "SELECT SUM(failing_rows) n FROM CARELENS.CURATED.DQ_CHECKS").iloc[0]["N"])
         except Exception:
             pass
 
@@ -280,10 +286,10 @@ if page == "Home":
             cards_html += f'''<div class="snap-card sc-red">
                 <div class="sc-num">{n_high}</div>
                 <div class="sc-label">High-Risk Patients</div>
-                <div class="sc-detail">Highest LACE: {int(high_risk.iloc[0]["LACE_INDEX"])}</div>
+                <div class="sc-detail">Highest LACE: {safe_int(high_risk.iloc[0]["LACE_INDEX"])}</div>
             </div>'''
 
-        n_gaps = int(kpi["OPEN_GAPS"])
+        n_gaps = safe_int(kpi["OPEN_GAPS"])
         gap_color = "sc-red" if n_gaps > 20 else "sc-amber" if n_gaps > 0 else "sc-green"
         cards_html += f'''<div class="snap-card {gap_color}">
             <div class="sc-num">{n_gaps}</div>
@@ -305,13 +311,13 @@ if page == "Home":
             </div>'''
 
         cards_html += f'''<div class="snap-card sc-blue">
-            <div class="sc-num">{int(kpi["PATIENTS"]):,}</div>
+            <div class="sc-num">{safe_int(kpi["PATIENTS"]):,}</div>
             <div class="sc-label">Total Patients</div>
-            <div class="sc-detail">{int(kpi["ENCOUNTERS"]):,} encounters</div>
+            <div class="sc-detail">{safe_int(kpi["ENCOUNTERS"]):,} encounters</div>
         </div>'''
 
         cards_html += f'''<div class="snap-card sc-blue">
-            <div class="sc-num">{int(kpi["DOCUMENTS"]):,}</div>
+            <div class="sc-num">{safe_int(kpi["DOCUMENTS"]):,}</div>
             <div class="sc-label">Documents Indexed</div>
             <div class="sc-detail">Avg LACE: {kpi["AVG_LACE"]}</div>
         </div>'''
@@ -335,7 +341,7 @@ if page == "Home":
             st.markdown(f'''<div class="action-tile">
                 <div class="at-icon">&#128100;</div>
                 <div class="at-title">Patient Lookup</div>
-                <div class="at-stat">{int(kpi["PATIENTS"]):,} patients on file</div>
+                <div class="at-stat">{safe_int(kpi["PATIENTS"]):,} patients on file</div>
             </div>''', unsafe_allow_html=True)
             if st.button("Open Patient 360", key="go_patient", use_container_width=True):
                 go("Patient 360")
@@ -370,8 +376,8 @@ if page == "Home":
                     <td><strong>{r["PATIENT_ID"]}</strong><br><span style="font-size:0.78rem;color:#64748b">{r["FULL_NAME"]}</span></td>
                     <td>{r["ATTRIBUTED_CLINIC"]}</td>
                     <td><span class="risk-badge {badge_cls}">{band}</span></td>
-                    <td><strong>{int(r["LACE_INDEX"])}</strong></td>
-                    <td><strong>{int(r["CARELENS_ADJUSTED_SCORE"])}</strong></td>
+                    <td><strong>{safe_int(r["LACE_INDEX"])}</strong></td>
+                    <td><strong>{safe_int(r["CARELENS_ADJUSTED_SCORE"])}</strong></td>
                 </tr>'''
             tbl += '</tbody></table>'
             st.markdown(tbl, unsafe_allow_html=True)
@@ -379,7 +385,9 @@ if page == "Home":
         # ---- Care gap breakdown ----
         if not gap_summary.empty:
             st.markdown("#### Care Gaps by Type")
-            st.bar_chart(gap_summary.set_index("GAP_TYPE")["CNT"], use_container_width=True)
+            chart_data = gap_summary.copy()
+            chart_data["CNT"] = pd.to_numeric(chart_data["CNT"], errors="coerce").astype(int)
+            st.bar_chart(chart_data.set_index("GAP_TYPE")["CNT"])
 
     except Exception as exc:
         st.error(f"Could not load dashboard: {exc}")
@@ -467,9 +475,9 @@ elif page == "Patient 360":
             k0 = risk.iloc[0]
             a, b, c, d = st.columns(4)
             a.metric("Risk band", k0["RISK_BAND"])
-            b.metric("LACE index", int(k0["LACE_INDEX"]))
-            c.metric("Adjusted score", int(k0["CARELENS_ADJUSTED_SCORE"]))
-            d.metric("Open gaps", int(q(session, f"SELECT COUNT(*) n FROM CARELENS.GOLD.CARE_GAP WHERE patient_id='{pid}'").iloc[0]["N"]))
+            b.metric("LACE index", safe_int(k0["LACE_INDEX"]))
+            c.metric("Adjusted score", safe_int(k0["CARELENS_ADJUSTED_SCORE"]))
+            d.metric("Open gaps", safe_int(q(session, f"SELECT COUNT(*) n FROM CARELENS.GOLD.CARE_GAP WHERE patient_id='{pid}'").iloc[0]["N"]))
 
             st.info(f"**Why this score:** {k0['SCORE_EXPLANATION']}")
             st.caption(f"Methodology: {k0['METHODOLOGY_CITATION']}")
@@ -480,8 +488,8 @@ elif page == "Patient 360":
                 "Component": ["L -- length of stay", "A -- acuity of admission",
                               "C -- comorbidity (Charlson)", "E -- ED visits, prior 6 months",
                               "Local: adherence", "Local: documented barrier"],
-                "Points": [int(k0["L_POINTS"]), int(k0["A_POINTS"]), int(k0["C_POINTS"]),
-                           int(k0["E_POINTS"]), int(k0["MOD_ADHERENCE_POINT"]), int(k0["MOD_BARRIER_POINT"])],
+                "Points": [safe_int(k0["L_POINTS"]), safe_int(k0["A_POINTS"]), safe_int(k0["C_POINTS"]),
+                           safe_int(k0["E_POINTS"]), safe_int(k0["MOD_ADHERENCE_POINT"]), safe_int(k0["MOD_BARRIER_POINT"])],
                 "In published LACE": ["yes", "yes", "yes", "yes", "no", "no"],
             }), use_container_width=True, hide_index=True)
 
