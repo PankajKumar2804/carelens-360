@@ -527,6 +527,7 @@ elif page == "Patient 360":
                                ORDER BY collected_date DESC LIMIT 12""")
             if not labs.empty:
                 labs['COLLECTED_DATE'] = pd.to_datetime(labs['COLLECTED_DATE'])
+                labs['RESULT_VALUE'] = pd.to_numeric(labs['RESULT_VALUE'], errors='coerce')
                 pivot_labs = labs.pivot_table(index='COLLECTED_DATE', columns='TEST_NAME', values='RESULT_VALUE')
                 st.line_chart(pivot_labs)
                 with st.expander("Raw lab data"):
@@ -555,7 +556,9 @@ elif page == "Clinic Analytics":
                            GROUP BY 1 ORDER BY avg_risk_score DESC""")
         c1, c2 = st.columns([2, 1])
         with c1:
-            st.bar_chart(clinic_risk.set_index('ATTRIBUTED_CLINIC')['AVG_RISK_SCORE'])
+            chart = clinic_risk.copy()
+            chart['AVG_RISK_SCORE'] = pd.to_numeric(chart['AVG_RISK_SCORE'], errors='coerce')
+            st.bar_chart(chart.set_index('ATTRIBUTED_CLINIC')['AVG_RISK_SCORE'])
         with c2:
             st.dataframe(clinic_risk, use_container_width=True, hide_index=True)
 
@@ -565,7 +568,9 @@ elif page == "Clinic Analytics":
                            FROM CARELENS.GOLD.CARE_GAP g
                            JOIN CARELENS.GOLD.PATIENT_360 p USING (patient_id)
                            GROUP BY 1 ORDER BY total_open_gaps DESC""")
-        st.bar_chart(clinic_gaps.set_index('ATTRIBUTED_CLINIC'))
+        cg = clinic_gaps.copy()
+        cg['TOTAL_OPEN_GAPS'] = pd.to_numeric(cg['TOTAL_OPEN_GAPS'], errors='coerce')
+        st.bar_chart(cg.set_index('ATTRIBUTED_CLINIC'))
     except Exception as exc:
         st.error(f"Could not load clinic analytics: {exc}")
 
@@ -581,12 +586,12 @@ elif page == "Trust & Evidence":
                       UNION ALL SELECT 'Document chunks', COUNT(*) FROM CARELENS.CURATED.DOC_CHUNK""")
         cols = st.columns(len(counts))
         for col, row in zip(cols, counts.itertuples()):
-            col.metric(row.OBJECT, f"{row.N:,}")
+            col.metric(row.OBJECT, f"{safe_int(row.N):,}")
 
         st.markdown("**Data quality gates** -- zero failing rows is the release condition")
         dq = q(session, "SELECT * FROM CARELENS.CURATED.DQ_CHECKS ORDER BY failing_rows DESC")
         st.dataframe(dq, use_container_width=True, hide_index=True)
-        if dq["FAILING_ROWS"].sum() == 0:
+        if safe_int(dq["FAILING_ROWS"].sum()) == 0:
             st.success("All quality gates pass.")
         else:
             st.error("One or more gates failed. Fix before demoing.")
@@ -599,7 +604,9 @@ elif page == "Trust & Evidence":
                           FROM CARELENS.GOLD.RISK_READMISSION GROUP BY 1 ORDER BY avg_lace DESC""")
         rc1, rc2 = st.columns([2, 1])
         with rc1:
-            st.bar_chart(risk_dist.set_index('RISK_BAND')['PATIENTS'])
+            rd = risk_dist.copy()
+            rd['PATIENTS'] = pd.to_numeric(rd['PATIENTS'], errors='coerce')
+            st.bar_chart(rd.set_index('RISK_BAND')['PATIENTS'])
         with rc2:
             st.dataframe(risk_dist, use_container_width=True, hide_index=True)
 
