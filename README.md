@@ -43,7 +43,7 @@ snow connection add
 
 What these commands do:
 - **`all`**: Builds the entire project from scratch. It sets up the database, generates synthetic data, uploads it to Snowflake, and runs all 7 SQL scripts to build the views, agent specs, governance policies, and tests.
-- **`app`**: Deploys the user interface. It pushes `app/carelens_app.py` to Snowflake as a Streamlit app.
+- **`app`**: Deploys the user interface by pushing `app/carelens_app.py` directly to Snowflake using the `deploy_app.ps1` script (or `run.sh app`).
 - **`demo`**: Runs a presentation script (`demo/demo_queries.sql`) to verify the system works end-to-end.
 
 Takes a few minutes. The Cortex Search services need a moment to index before the copilot is
@@ -68,7 +68,7 @@ sql/04_semantic_view.sql      semantic view for Cortex Analyst
 sql/05_search_and_agent.sql   three search services + the agent spec
 sql/06_governance.sql         masking, row access, audit log
 sql/07_eval.sql               golden questions + an LLM judge
-app/carelens_app.py           Streamlit UI (copilot / patient view / trust)
+app/carelens_app.py           Streamlit UI (Single-page copilot interface)
 .cortex/                      skills, services, hooks for CoCo CLI
 ```
 
