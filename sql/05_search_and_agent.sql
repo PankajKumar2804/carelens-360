@@ -68,7 +68,7 @@ WITH PROFILE = '{"display_name":"CareLens 360 Copilot"}'
 COMMENT = 'Clinical, safety and regulatory Q and A over a synthetic patient/member 360 with cited evidence.'
 FROM SPECIFICATION $$
 models:
-  orchestration: auto
+  orchestration: claude-sonnet-4-5
 
 instructions:
   response: |
