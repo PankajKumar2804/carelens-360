@@ -35,10 +35,16 @@ named score, because quietly bending a published index and still calling it LACE
 ```bash
 pip install snowflake-cli
 snow connection add
+# Use ./run.sh for macOS/Linux, or .\run.ps1 for Windows
 ./run.sh all      # generates data, deploys all eight SQL layers
 ./run.sh app      # pushes the Streamlit app
 ./run.sh demo     # runs the walkthrough queries end to end
 ```
+
+What these commands do:
+- **`all`**: Builds the entire project from scratch. It sets up the database, generates synthetic data, uploads it to Snowflake, and runs all 7 SQL scripts to build the views, agent specs, governance policies, and tests.
+- **`app`**: Deploys the user interface. It pushes `app/carelens_app.py` to Snowflake as a Streamlit app.
+- **`demo`**: Runs a presentation script (`demo/demo_queries.sql`) to verify the system works end-to-end.
 
 Takes a few minutes. The Cortex Search services need a moment to index before the copilot is
 useful, so if the first question comes back empty, wait and retry.

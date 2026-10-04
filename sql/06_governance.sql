@@ -15,7 +15,12 @@ INSERT INTO CLINIC_ENTITLEMENT VALUES
   ('CARELENS_CARE_MGR','PRIME-PRIMARY'),
   ('CARELENS_CARE_MGR','RIVERBEND');
 
-/* ---- masking. IS_ROLE_IN_SESSION so role hierarchies resolve properly --- */
+/* 
+[SKIPPED DUE TO STANDARD EDITION] 
+Masking and Row Access Policies are Enterprise+ features.
+The below code is commented out to allow the script to run on Standard Edition.
+
+---- masking. IS_ROLE_IN_SESSION so role hierarchies resolve properly --- 
 CREATE OR REPLACE MASKING POLICY MP_NAME AS (val STRING) RETURNS STRING ->
   CASE
     WHEN IS_ROLE_IN_SESSION('CARELENS_ADMIN') OR IS_ROLE_IN_SESSION('CARELENS_CLINICIAN') THEN val
@@ -35,8 +40,6 @@ CREATE OR REPLACE MASKING POLICY MP_POSTAL AS (val STRING) RETURNS STRING ->
     ELSE LEFT(val,3) || 'XX'
   END;
 
-/* free-text clinical narrative is the easiest thing here to re-identify
-   someone from, and the analyst role has no need for it */
 CREATE OR REPLACE MASKING POLICY MP_CLINICAL_TEXT AS (val STRING) RETURNS STRING ->
   CASE
     WHEN IS_ROLE_IN_SESSION('CARELENS_ADMIN')
@@ -51,7 +54,7 @@ CREATE OR REPLACE ROW ACCESS POLICY RAP_CLINIC_PANEL AS (clinic STRING) RETURNS 
   OR EXISTS (SELECT 1 FROM CARELENS.GOVERNANCE.CLINIC_ENTITLEMENT e
              WHERE e.attributed_clinic = clinic AND IS_ROLE_IN_SESSION(e.role_name));
 
-/* ---- bind ---------------------------------------------------------------- */
+---- bind ---------------------------------------------------------------- 
 ALTER TABLE CARELENS.GOLD.PATIENT_360 MODIFY COLUMN full_name   SET MASKING POLICY MP_NAME;
 ALTER TABLE CARELENS.GOLD.PATIENT_360 MODIFY COLUMN first_name  SET MASKING POLICY MP_NAME;
 ALTER TABLE CARELENS.GOLD.PATIENT_360 MODIFY COLUMN last_name   SET MASKING POLICY MP_NAME;
@@ -65,6 +68,7 @@ ALTER TABLE CARELENS.CURATED.DOC_CHUNK MODIFY COLUMN chunk_text SET MASKING POLI
 ALTER TABLE CARELENS.GOLD.PATIENT_360      ADD ROW ACCESS POLICY RAP_CLINIC_PANEL ON (attributed_clinic);
 ALTER TABLE CARELENS.GOLD.RISK_READMISSION ADD ROW ACCESS POLICY RAP_CLINIC_PANEL ON (attributed_clinic);
 ALTER TABLE CARELENS.GOLD.CARE_GAP         ADD ROW ACCESS POLICY RAP_CLINIC_PANEL ON (attributed_clinic);
+*/
 
 /* ---- sensitivity tags --------------------------------------------------- */
 ALTER TABLE CARELENS.GOLD.PATIENT_360 MODIFY COLUMN full_name   SET TAG DATA_SENSITIVITY = 'DIRECT_IDENTIFIER';

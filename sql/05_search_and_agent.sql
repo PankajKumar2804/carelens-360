@@ -68,7 +68,7 @@ WITH PROFILE = '{"display_name":"CareLens 360 Copilot"}'
 COMMENT = 'Clinical, safety and regulatory Q and A over a synthetic patient/member 360 with cited evidence.'
 FROM SPECIFICATION $$
 models:
-  orchestration: auto
+  orchestration: claude-haiku-4-5
 
 instructions:
   response: |
@@ -192,3 +192,6 @@ GRANT USAGE ON AGENT CARELENS_COPILOT TO ROLE CARELENS_ANALYST;
 SELECT SNOWFLAKE.CORTEX.SEARCH_PREVIEW('CARELENS.AI.REGULATORY_DOC_SEARCH',
   '{"query":"ARNI coverage criteria ejection fraction potassium",
     "columns":["chunk_text","doc_id","section_heading","citation_label"],"limit":3}') AS probe;
+
+GRANT USAGE ON AGENT CARELENS_COPILOT TO ROLE CARELENS_ADMIN;
+GRANT USAGE ON AGENT CARELENS_COPILOT TO ROLE ACCOUNTADMIN;
