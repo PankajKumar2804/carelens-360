@@ -23,11 +23,20 @@ for _d in (S, D):
         os.remove(os.path.join(_d, _f))
 
 FIRST = ["Aarav","Nadia","Ellis","Ravi","Imani","Soren","Lucia","Devin","Priya","Owen",
-         "Maren","Kofi","Ines","Tomas","Yara","Niall","Zoya","Elias","Farah","Quinn"]
+         "Maren","Kofi","Ines","Tomas","Yara","Niall","Zoya","Elias","Farah","Quinn",
+         "Amara","Bodhi","Celine","Dario","Esme","Felix","Gita","Hugo","Isla","Jovan",
+         "Kaia","Leo","Maya","Nico","Opal","Pavan","Rhea","Samir","Thea","Uma",
+         "Vidal","Wren","Xena","Yusuf","Zara","Alina","Bastian","Chiara","Dmitri","Eva",
+         "Freya","Gavin","Hana","Ivan","Jade","Kenji","Lila","Marco","Noor","Oscar"]
 LAST  = ["Alvarez","Okafor","Lindqvist","Nambiar","Carvalho","Bright","Halloran","Mensah",
-         "Vartanian","Dorsey","Kaminski","Ibarra","Rossetti","Farley","Nazari","Whitlock"]
+         "Vartanian","Dorsey","Kaminski","Ibarra","Rossetti","Farley","Nazari","Whitlock",
+         "Tanaka","Petrov","Osei","Bergstrom","Morales","Sinclair","Deshpande","Olsen",
+         "Guerrero","Fitzpatrick","Rao","Christensen","Nwosu","Belmont","Park","Salazar",
+         "Volkov","Ashworth","Diallo","Jansen","Takahashi","DaCosta","Eriksson","Mahmoud"]
 CITY  = [("Fairview","OH"),("Cedar Falls","IA"),("Northgate","WA"),("Rio Vista","CA"),
-         ("Millbrook","NY"),("Ashford","TX"),("Glenmoor","GA"),("Kestrel","CO")]
+         ("Millbrook","NY"),("Ashford","TX"),("Glenmoor","GA"),("Kestrel","CO"),
+         ("Lakeview","MN"),("Pinehurst","NC"),("Stonefield","MA"),("Clearwater","FL"),
+         ("Ridgewood","NJ"),("Sunridge","AZ"),("Brookdale","PA"),("Windham","CT")]
 PLANS = [("HMO-BRONZE","Aegis Health Plan"),("PPO-SILVER","Aegis Health Plan"),
          ("HMO-GOLD","Northwind Mutual"),("MA-PPO","Northwind Mutual"),("MEDICAID-MCO","StateCare MCO")]
 
@@ -67,7 +76,7 @@ LABS = [
  ("2085-9","HDL cholesterol","mg/dL",40,80),
 ]
 ENC_TYPE = ["INPATIENT","OUTPATIENT","EMERGENCY","TELEHEALTH"]
-N_PATIENTS = 220
+N_PATIENTS = random.randint(5000, 10000)
 today = date(2026, 9, 1)
 
 def rdate(start_days, end_days):
@@ -217,7 +226,7 @@ ip = [e for e in encounters if e["encounter_type"]=="INPATIENT"]
 random.shuffle(ip)
 pmap = {p["patient_id"]: p for p in patients}
 
-for e in ip[:70]:
+for e in ip[:1500]:
     p = pmap[e["patient_id"]]
     dxs = [d for d in diagnoses if d["patient_id"]==p["patient_id"]] or [{"description":"Essential hypertension","icd10_code":"I10"}]
     mds = [m for m in medications if m["patient_id"]==p["patient_id"]][:4]
